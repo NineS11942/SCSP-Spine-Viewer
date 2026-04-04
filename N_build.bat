@@ -21,9 +21,9 @@ if errorlevel 1 (
 
 :: Clean old builds
 echo [1/3] Cleaning old builds...
-if exist SCSP_Spine_Viewer.dist rmdir /s /q SCSP_Spine_Viewer.dist
-if exist SCSP_Spine_Viewer.build rmdir /s /q SCSP_Spine_Viewer.build
-if exist SCSP_Spine_Viewer.onefile-build rmdir /s /q SCSP_Spine_Viewer.onefile-build
+if exist spine_viewer.dist rmdir /s /q spine_viewer.dist
+if exist spine_viewer.build rmdir /s /q spine_viewer.build
+if exist spine_viewer.onefile-build rmdir /s /q spine_viewer.onefile-build
 
 :: Build
 echo [2/3] Nuitka compiling (may take a few minutes)...
@@ -32,14 +32,17 @@ python -m nuitka ^
     --standalone ^
     --output-filename=SCSP_Spine_Viewer.exe ^
     --include-data-file=index.html=index.html ^
+    --include-data-file=scsp_decoder.py=scsp_decoder.py ^
+    --include-data-file=model_extractor.py=model_extractor.py ^
     --include-package=lz4 ^
     --include-package=texture2ddecoder ^
     --include-package=PIL ^
     --include-package=numpy ^
     --include-package=flask ^
+    --include-module=scsp_decoder ^
     --enable-plugin=numpy ^
     --assume-yes-for-downloads ^
-    --windows-console-mode=attach ^
+    --windows-console-mode=force ^
     spine_viewer.py
 
 if errorlevel 1 (
@@ -51,8 +54,8 @@ if errorlevel 1 (
 
 :: Cleanup
 echo [3/3] Cleaning up...
-if exist SCSP_Spine_Viewer.build rmdir /s /q SCSP_Spine_Viewer.build
-if exist SCSP_Spine_Viewer.onefile-build rmdir /s /q SCSP_Spine_Viewer.onefile-build
+if exist spine_viewer.build rmdir /s /q spine_viewer.build
+if exist spine_viewer.onefile-build rmdir /s /q spine_viewer.onefile-build
 
 echo.
 echo ==================================================

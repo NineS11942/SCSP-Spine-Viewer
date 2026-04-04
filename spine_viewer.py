@@ -200,9 +200,37 @@ def get_texture(name):
     return "Texture not found", 404
 
 
+@app.route('/api/launch_extractor', methods=['POST'])
+def launch_extractor():
+    """启动模型解包 GUI"""
+    import subprocess
+    script = os.path.join(os.path.dirname(__file__), 'model_extractor.py')
+    if not os.path.exists(script):
+        # 尝试 exe 同目录
+        script = os.path.join(os.path.dirname(sys.executable), 'model_extractor.py')
+    if not os.path.exists(script):
+        return jsonify({'ok': False, 'error': 'model_extractor.py not found'})
+    try:
+        subprocess.Popen([sys.executable, script], cwd=os.path.dirname(script))
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
 if __name__ == '__main__':
+    import webbrowser, threading
+
     print("\n" + "="*50)
     print("  SCSP Spine Viewer")
     print("  http://localhost:5000")
     print("="*50 + "\n")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+
+    # 启动 1.5 秒后自动打开浏览器
+    threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
+
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=False)
+    except Exception as e:
+        print(f"\n[ERROR] {e}")
+        input("按回车键退出...")
+

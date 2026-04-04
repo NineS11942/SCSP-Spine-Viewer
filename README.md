@@ -17,18 +17,16 @@
 
 ### 下载
 
-从 [Releases](../../releases) 下载最新版本：
-
-- **`SCSP_Spine_Viewer.exe`** — 主程序
-- **`index.html`** — 前端页面（必须和 exe 放在同一目录）
+从 [Releases](../../releases) 下载最新版本压缩包。
 
 ### 使用方法
 
-1. 将 `SCSP_Spine_Viewer.exe` 和 `index.html` 放在同一文件夹
-2. 双击运行 `SCSP_Spine_Viewer.exe`
-3. 打开浏览器访问 `http://localhost:5000`
-4. 在顶部输入解包后的模型文件夹路径（如 `G:\keasi\unpacked\model`），点击 **加载**
-5. 左侧列表选择模型，右侧实时预览动画
+1. 下载 `SCSP_Spine_Viewer_vX.X.zip`
+2. 解压到任意文件夹
+3. 双击运行 `SCSP_Spine_Viewer.exe`
+4. 浏览器会自动打开（或手动访问 `http://localhost:5000`）
+5. 在顶部输入解包后的模型文件夹路径（如 `G:\keasi\unpacked\model`），点击 **加载**
+6. 左侧列表选择模型，右侧实时预览动画
 
 ### 快捷键
 
@@ -118,6 +116,8 @@ SCT2 Header (72 bytes)
 - Deform 动画数据解析不完整，前端自动跳过
 - 部分模型动画名可能出现乱码，自动过滤
 - 极少数复杂模型 fallback 到静态姿态显示
+
+> ℹ 后端 SCSP 解析本身没有问题，以上限制均来自前端 pixi-spine 兼容性适配，修复较为复杂
 
 ---
 

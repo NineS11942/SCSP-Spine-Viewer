@@ -1,0 +1,7 @@
+*.bat
+*.exe
+*.zip
+__pycache__/
+*.build/
+*.dist/
+*.onefile-build/

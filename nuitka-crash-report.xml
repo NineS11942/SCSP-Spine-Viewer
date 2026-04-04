@@ -1,0 +1,81 @@
+<?xml version='1.0' encoding='utf8'?>
+<nuitka-compilation-report nuitka_version="4.0.1" nuitka_commercial_version="not installed" mode="onefile" completion="exception">
+  <exception exception_type="FileNotFoundError" exception_value="[WinError 2] 系统找不到指定的文件。: 'spine_viewer.build\\module.PIL.IcnsImagePlugin.const'">
+Traceback (most recent call last):
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 1348, in main
+    _main()
+    ~~~~~^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 1169, in _main
+    main_module = _createMainModule()
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 267, in _createMainModule
+    cleanSconsDirectory(source_dir)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\build\SconsInterface.py", line 573, in cleanSconsDirectory
+    check(path)
+    ~~~~~^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\build\SconsInterface.py", line 569, in check
+    deleteFile(path, must_exist=True)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\utils\FileOperations.py", line 824, in deleteFile
+    os.unlink(path)
+    ~~~~~~~~~^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。: 'spine_viewer.build\\module.PIL.IcnsImagePlugin.const'
+</exception>
+  <scons_environment />
+  <performance>
+    <memory_usage name="after_launch" value="35401728" />
+  </performance>
+  <data_file name="index.html" source="${cwd}\index.html" size="23759" reason="specified data file 'index.html=index.html' on command line" tags="user,copy" />
+  <data_composer blob_size="None" />
+  <command_line>
+    <option value="--onefile" />
+    <option value="--standalone" />
+    <option value="--output-filename=SCSP_Spine_Viewer.exe" />
+    <option value="--include-data-file=index.html=index.html" />
+    <option value="--include-package=lz4" />
+    <option value="--include-package=texture2ddecoder" />
+    <option value="--include-package=PIL" />
+    <option value="--include-package=numpy" />
+    <option value="--include-package=flask" />
+    <option value="--enable-plugin=numpy" />
+    <option value="--assume-yes-for-downloads" />
+    <option value="--windows-console-mode=attach" />
+    <option value="spine_viewer.py" />
+  </command_line>
+  <plugins>
+    <plugin name="anti-bloat" user_enabled="no" />
+    <plugin name="data-files" user_enabled="no" />
+    <plugin name="delvewheel" user_enabled="no" />
+    <plugin name="dll-files" user_enabled="no" />
+    <plugin name="eventlet" user_enabled="no" />
+    <plugin name="gevent" user_enabled="no" />
+    <plugin name="gi" user_enabled="no" />
+    <plugin name="glfw" user_enabled="no" />
+    <plugin name="implicit-imports" user_enabled="no" />
+    <plugin name="kivy" user_enabled="no" />
+    <plugin name="matplotlib" user_enabled="no" />
+    <plugin name="multiprocessing" user_enabled="no" />
+    <plugin name="options-nanny" user_enabled="no" />
+    <plugin name="pbr-compat" user_enabled="no" />
+    <plugin name="pkg-resources" user_enabled="no" />
+    <plugin name="playwright" user_enabled="no" />
+    <plugin name="pywebview" user_enabled="no" />
+    <plugin name="spacy" user_enabled="no" />
+    <plugin name="transformers" user_enabled="no" />
+  </plugins>
+  <onefile cache_mode="temporary" unpack_dir="{TEMP}\onefile_{PID}_{TIME}" />
+  <distributions />
+  <python python_exe="${sys.prefix}\python.exe" python_flavor="CPython Official" python_version="3.13.5" os_name="Windows" os_release="10" arch_name="x86_64" filesystem_encoding="utf-8" gil="yes">
+    <search_path>
+      <path value="${cwd}" />
+      <path value="${sys.prefix}\DLLs" />
+      <path value="${sys.prefix}\Lib" />
+      <path value="${sys.prefix}" />
+      <path value="${sys.prefix}\Lib\site-packages" />
+      <path value="${sys.prefix}\Lib\site-packages\win32" />
+      <path value="${sys.prefix}\Lib\site-packages\win32\lib" />
+      <path value="${sys.prefix}\Lib\site-packages\Pythonwin" />
+    </search_path>
+  </python>
+  <output run_filename="${cwd}\SCSP_Spine_Viewer.exe" />
+</nuitka-compilation-report>

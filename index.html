@@ -108,11 +108,47 @@ body {
 .status {
   font-size: 12px;
   color: var(--text-secondary);
-  margin-left: auto;
 }
 
 .status.ok { color: var(--success); }
 .status.err { color: var(--danger); }
+
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.header-links a, .header-links .link-btn {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.header-links a:hover, .header-links .link-btn:hover {
+  color: var(--accent);
+}
+
+.header-links .extract-btn {
+  padding: 5px 12px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-links .extract-btn:hover {
+  background: #00b890;
+  transform: translateY(-1px);
+}
 
 /* ─── Sidebar ─── */
 .sidebar {
@@ -334,12 +370,16 @@ body {
 <div class="app">
   <!-- Header -->
   <div class="header">
-    <h1>⚡ SCSP Spine Viewer</h1>
     <div class="folder-input">
       <input type="text" id="folderPath" placeholder="输入模型文件夹路径, 如 G:\keasi\unpacked\model" />
       <button onclick="loadFolder()">加载</button>
     </div>
     <span class="status" id="status"></span>
+    <div class="header-links">
+      <button class="extract-btn" onclick="launchExtractor()" title="自动从 data.pack 解包模型文件">📦 没有模型文件? 点我获取</button>
+      <a href="https://github.com/NineS11942/SCSP-Spine-Viewer" target="_blank">⭐ GitHub</a>
+      <span class="link-btn" onclick="navigator.clipboard.writeText('777529227');this.textContent='已复制!';setTimeout(()=>this.textContent='💬 QQ群: 777529227',2000)" title="点击复制群号">💬 QQ群: 777529227</span>
+    </div>
   </div>
 
   <!-- Sidebar -->
@@ -765,6 +805,21 @@ document.addEventListener('keydown', (e) => {
     if (sel.selectedIndex > 0) { sel.selectedIndex--; playAnimation(); }
   }
 });
+
+// ─── 启动解包工具 ───
+async function launchExtractor() {
+  try {
+    const r = await fetch('/api/launch_extractor', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      setStatus('解包工具已启动', 'ok');
+    } else {
+      setStatus(d.error || '启动失败', 'err');
+    }
+  } catch(e) {
+    setStatus('启动解包工具失败: ' + e.message, 'err');
+  }
+}
 </script>
 </body>
 </html>
