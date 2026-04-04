@@ -150,6 +150,25 @@ body {
   transform: translateY(-1px);
 }
 
+.header-links .qq-btn {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #12b7f5, #0d8bd9);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.header-links .qq-btn:hover {
+  background: linear-gradient(135deg, #0d8bd9, #0a6fb5);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(18,183,245,0.35);
+}
+
 /* ─── Sidebar ─── */
 .sidebar {
   background: var(--bg-secondary);
@@ -378,7 +397,7 @@ body {
     <div class="header-links">
       <button class="extract-btn" onclick="launchExtractor()" title="自动从 data.pack 解包模型文件">📦 没有模型文件? 点我获取</button>
       <a href="https://github.com/NineS11942/SCSP-Spine-Viewer" target="_blank">⭐ GitHub</a>
-      <span class="link-btn" onclick="navigator.clipboard.writeText('777529227');this.textContent='已复制!';setTimeout(()=>this.textContent='💬 QQ群: 777529227',2000)" title="点击复制群号">💬 QQ群: 777529227</span>
+      <button class="qq-btn" onclick="navigator.clipboard.writeText('777529227');this.textContent='✅ 已复制!';setTimeout(()=>this.textContent='💬 QQ群: 777529227',2000)" title="点击复制群号">💬 QQ群: 777529227</button>
     </div>
   </div>
 
