@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCSP Spine Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a28;
+  --bg-hover: #252538;
+  --accent: #6c5ce7;
+  --accent-glow: rgba(108, 92, 231, 0.3);
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888a0;
+  --text-dim: #555570;
+  --border: #2a2a3a;
+  --success: #00d2a0;
+  --warning: #ffa502;
+  --danger: #ff4757;
+  --radius: 12px;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Layout ─── */
+.app {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: 64px 1fr;
+  height: 100vh;
+}
+
+/* ─── Header ─── */
+.header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  z-index: 10;
+}
+
+.header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+
+.header .folder-input {
+  flex: 1;
+  max-width: 500px;
+  display: flex;
+  gap: 8px;
+}
+
+.header input[type="text"] {
+  flex: 1;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'Inter', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.header input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.header button {
+  padding: 8px 20px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.header button:hover {
+  background: #7c6cf7;
+  transform: translateY(-1px);
+}
+
+.status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.status.ok { color: var(--success); }
+.status.err { color: var(--danger); }
+
+/* ─── Sidebar ─── */
+.sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-search {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-search input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.sidebar-search input:focus {
+  border-color: var(--accent);
+}
+
+.model-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.model-list::-webkit-scrollbar { width: 6px; }
+.model-list::-webkit-scrollbar-track { background: transparent; }
+.model-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.model-item {
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.model-item:hover {
+  background: var(--bg-hover);
+}
+
+.model-item.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+
+.model-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+.model-item .dot.partial { background: var(--warning); }
+.model-item .dot.missing { background: var(--text-dim); }
+
+.model-count {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+/* ─── Main Viewer ─── */
+.viewer {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(108,92,231,0.05) 0%, transparent 60%),
+    linear-gradient(var(--bg-primary), #0d0d14);
+}
+
+.canvas-container canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.placeholder {
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.placeholder .icon { font-size: 64px; margin-bottom: 16px; }
+.placeholder p { font-size: 14px; }
+
+/* ─── Controls ─── */
+.controls {
+  padding: 16px 24px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.controls select {
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.controls select:focus {
+  border-color: var(--accent);
+}
+
+.btn-group {
+  display: flex;
+  gap: 4px;
+}
+
+.btn {
+  padding: 6px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed-control input[type="range"] {
+  width: 100px;
+  accent-color: var(--accent);
+}
+
+.info-bar {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ─── Loading ─── */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,10,15,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>⚡ SCSP Spine Viewer</h1>
+    <div class="folder-input">
+      <input type="text" id="folderPath" placeholder="输入模型文件夹路径, 如 G:\keasi\unpacked\model" />
+      <button onclick="loadFolder()">加载</button>
+    </div>
+    <span class="status" id="status"></span>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="🔍 搜索模型..." oninput="filterModels()" />
+    </div>
+    <div class="model-list" id="modelList">
+      <div class="placeholder" style="padding:40px 20px">
+        <p>加载文件夹以查看模型列表</p>
+      </div>
+    </div>
+    <div class="model-count" id="modelCount"></div>
+  </div>
+
+  <!-- Viewer -->
+  <div class="viewer">
+    <div class="canvas-container" id="canvasContainer">
+      <div class="placeholder" id="viewerPlaceholder">
+        <div class="icon">🦴</div>
+        <p>选择一个模型开始查看</p>
+      </div>
+    </div>
+    <div class="loading-overlay hidden" id="loading">
+      <div class="spinner"></div>
+    </div>
+    <div class="controls">
+      <label>动画</label>
+      <select id="animSelect" onchange="playAnimation()"></select>
+      <div class="btn-group">
+        <button class="btn active" id="btnPlay" onclick="togglePlay()">▶ 播放</button>
+        <button class="btn" onclick="toggleLoop()">🔁 循环</button>
+      </div>
+      <div class="speed-control">
+        <label>速度</label>
+        <input type="range" id="speedRange" min="0.1" max="3" step="0.1" value="1" oninput="setSpeed(this.value)" />
+        <span id="speedLabel">1.0x</span>
+      </div>
+      <div class="info-bar" id="infoBar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PixiJS + pixi-spine (v2 for Spine 3.8) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.12/pixi.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi-spine@2.1.14/dist/pixi-spine.js"></script>
+
+<script>
+let pixiApp = null;
+let currentSpine = null;
+let allModels = [];
+let currentModel = null;
+let isPlaying = true;
+let isLooping = true;
+let playSpeed = 1.0;
+let cachedSkelData = null;
+
+// ─── 文件夹加载 ───
+async function loadFolder() {
+  const folder = document.getElementById('folderPath').value.trim();
+  if (!folder) return;
+  setStatus('加载中...', '');
+  try {
+    const r = await fetch('/api/set_folder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({folder})
+    });
+    const d = await r.json();
+    if (d.error) { setStatus(d.error, 'err'); return; }
+    const lr = await fetch('/api/list');
+    const ld = await lr.json();
+    allModels = ld.models || [];
+    renderModelList(allModels);
+    setStatus(`已加载 ${allModels.length} 个模型`, 'ok');
+    document.getElementById('modelCount').textContent = `共 ${allModels.length} 个模型`;
+  } catch(e) {
+    setStatus('加载失败: ' + e.message, 'err');
+  }
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status ' + (cls || '');
+}
+
+// ─── 模型列表 ───
+function renderModelList(models) {
+  const el = document.getElementById('modelList');
+  if (!models.length) {
+    el.innerHTML = '<div class="placeholder" style="padding:40px 20px"><p>没有找到 .scsp 文件</p></div>';
+    return;
+  }
+  el.innerHTML = models.map(m => {
+    const dotCls = (m.hasAtlas && m.hasTexture) ? '' : m.hasAtlas || m.hasTexture ? 'partial' : 'missing';
+    const activeCls = currentModel === m.name ? 'active' : '';
+    return `<div class="model-item ${activeCls}" onclick="selectModel('${m.name}')" data-name="${m.name}">
+      <span class="dot ${dotCls}"></span>
+      <span>${m.name}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterModels() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = allModels.filter(m => m.name.toLowerCase().includes(q));
+  renderModelList(filtered);
+}
+
+// ─── 模型加载 ───
+async function selectModel(name) {
+  if (currentModel === name) return;
+  currentModel = name;
+  renderModelList(allModels.filter(m => {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    return !q || m.name.toLowerCase().includes(q);
+  }));
+  document.getElementById('loading').classList.remove('hidden');
+  const vp = document.getElementById('viewerPlaceholder');
+  if (vp) vp.classList.add('hidden');
+  setStatus(`加载 ${name}...`, '');
+
+  try {
+    if (!pixiApp) initPixi();
+    if (currentSpine) {
+      pixiApp.stage.removeChild(currentSpine);
+      currentSpine.destroy();
+      currentSpine = null;
+    }
+
+    // 1) Fetch skeleton JSON
+    const skelR = await fetch(`/api/skeleton/${name}`);
+    if (!skelR.ok) throw new Error(await skelR.text());
+    const skelData = await skelR.json();
+    cachedSkelData = skelData;
+
+    // 2) Fetch atlas text
+    const atlasR = await fetch(`/api/atlas/${name}`);
+    let atlasText = atlasR.ok ? await atlasR.text() : '';
+
+    if (atlasText) {
+      await loadSpineFromData(name, skelData, atlasText);
+    } else {
+      showSkeletonInfo(skelData);
+    }
+
+    // 3) Populate animation list
+    const animSelect = document.getElementById('animSelect');
+    animSelect.innerHTML = '';
+    const animations = Object.keys(skelData.animations || {});
+    animations.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a; opt.textContent = a;
+      animSelect.appendChild(opt);
+    });
+    if (animations.length && currentSpine) playAnimation();
+
+    document.getElementById('infoBar').textContent =
+      `骨骼: ${(skelData.bones||[]).length} | 插槽: ${(skelData.slots||[]).length} | 动画: ${animations.length}`;
+    setStatus(`${name} 加载完成`, 'ok');
+  } catch(e) {
+    console.error(e);
+    setStatus(`加载失败: ${e.message}`, 'err');
+  }
+  document.getElementById('loading').classList.add('hidden');
+}
+
+function initPixi() {
+  const container = document.getElementById('canvasContainer');
+  pixiApp = new PIXI.Application({
+    width: container.clientWidth,
+    height: container.clientHeight,
+    backgroundColor: 0x0a0a0f,
+    antialias: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+  });
+  container.innerHTML = '';
+  container.appendChild(pixiApp.view);
+  window.addEventListener('resize', () => {
+    const cw = container.clientWidth, ch = container.clientHeight;
+    pixiApp.renderer.resize(cw, ch);
+    if (currentSpine) { currentSpine.x = cw / 2; currentSpine.y = ch * 0.85; }
+  });
+}
+
+function loadSpineFromData(name, skelData, atlasText) {
+  return new Promise((resolve, reject) => {
+    // Find the correct pixi-spine API
+    const spineNs = PIXI.spine;
+    if (!spineNs) { reject(new Error('pixi-spine not loaded')); return; }
+
+    // pixi-spine 2.x exposes classes at PIXI.spine.core.*
+    const core = spineNs.core || spineNs;
+    const TextureAtlas = core.TextureAtlas;
+    const AtlasAttachmentLoader = core.AtlasAttachmentLoader;
+    const SkeletonJson = core.SkeletonJson;
+    const Spine = spineNs.Spine;
+
+    if (!TextureAtlas || !SkeletonJson || !Spine) {
+      // Fallback: use PIXI.Loader based approach
+      loadSpineViaLoader(name).then(resolve).catch(reject);
+      return;
+    }
+
+    // Parse atlas with async texture loading
+    let texturesLoading = 0;
+    let texturesLoaded = 0;
+
+    // Monkey-patch a PIXI.BaseTexture with spine-core required methods.
+    // pixi-spine internally does `new PIXI.Texture(page.texture)` so
+    // page.texture MUST be a real PIXI.BaseTexture (has .once from EventEmitter).
+    // spine-core also calls .setSize/.setFilters/.setWraps on it.
+    function patchForSpine(baseTex) {
+      baseTex.setSize = function(w, h) {};
+      baseTex.setFilters = function(min, mag) {};
+      baseTex.setWraps = function(u, v) {};
+      baseTex.dispose = function() { this.destroy(); };
+      baseTex.getImage = function() { return { width: this.width, height: this.height }; };
+      return baseTex;
+    }
+
+    const atlas = new TextureAtlas(atlasText, (path, loaderCb) => {
+      texturesLoading++;
+      const texName = path.replace(/\.[^.]+$/, '');
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        loaderCb(patchForSpine(PIXI.BaseTexture.from(img)));
+        texturesLoaded++;
+        if (texturesLoaded >= texturesLoading) finishLoad();
+      };
+      img.onerror = () => {
+        console.warn('Texture load failed:', path);
+        const c = document.createElement('canvas'); c.width=2; c.height=2;
+        loaderCb(patchForSpine(PIXI.BaseTexture.from(c)));
+        texturesLoaded++;
+        if (texturesLoaded >= texturesLoading) finishLoad();
+      };
+      img.src = `/api/texture/${texName}.png`;
+    });
+
+    function finishLoad() {
+      // Sanitize skeleton JSON to fix SCSP decoder artifacts
+      function sanitize(data) {
+        const d = JSON.parse(JSON.stringify(data));
+        if (!d.animations) return d;
+
+        // Helper: remove empty-key entries and empty arrays from an object
+        function cleanObj(obj) {
+          if (!obj || typeof obj !== 'object') return obj;
+          for (const k in obj) {
+            if (!k) { delete obj[k]; continue; }  // empty string key
+            const v = obj[k];
+            if (Array.isArray(v) && v.length === 0) { delete obj[k]; continue; }
+            if (typeof v === 'object' && !Array.isArray(v)) {
+              cleanObj(v);
+              if (Object.keys(v).length === 0) delete obj[k];
+            }
+          }
+          return obj;
+        }
+
+        const validAnims = {};
+        for (const name in d.animations) {
+          // Skip empty or garbage animation names
+          if (!name || name.length > 60 || /[^\x20-\x7E\u4e00-\u9fff\u3000-\u303f]/.test(name)) continue;
+          const anim = d.animations[name];
+          // Remove deform (often broken from SCSP decoder)
+          delete anim.deform;
+          // Deep-clean all sections: remove empty keys and empty arrays
+          for (const section of ['bones','slots','ik','transform','path']) {
+            if (anim[section]) {
+              cleanObj(anim[section]);
+              if (Object.keys(anim[section]).length === 0) delete anim[section];
+            }
+          }
+          // Clean drawOrder: remove entries with empty slot names
+          if (anim.drawOrder) {
+            anim.drawOrder = anim.drawOrder.filter(frame => {
+              if (frame.offsets) frame.offsets = frame.offsets.filter(o => o.slot);
+              return true;
+            });
+          }
+          validAnims[name] = anim;
+        }
+        d.animations = validAnims;
+        return d;
+      }
+
+      function buildSpine(data) {
+        // Always clean up previous spine from stage
+        if (currentSpine) {
+          pixiApp.stage.removeChild(currentSpine);
+          currentSpine.destroy();
+          currentSpine = null;
+        }
+        pixiApp.stage.removeChildren();
+        const atlasLoader = new AtlasAttachmentLoader(atlas);
+        const skelParser = new SkeletonJson(atlasLoader);
+        skelParser.scale = 1;
+        const skeletonData = skelParser.readSkeletonData(data);
+        currentSpine = new Spine(skeletonData);
+        const cw = pixiApp.renderer.width, ch = pixiApp.renderer.height;
+        currentSpine.x = cw / 2;
+        currentSpine.y = ch * 0.8;
+        pixiApp.stage.addChild(currentSpine);
+        currentSpine.updateTransform();
+        const bounds = currentSpine.getLocalBounds();
+        const bw = bounds.width || 300, bh = bounds.height || 300;
+        const scale = Math.min(cw * 0.8 / bw, ch * 0.7 / bh, 1.5);
+        currentSpine.scale.set(scale, scale);
+        currentSpine.y = ch * 0.85;
+      }
+      try {
+        buildSpine(sanitize(skelData));
+        resolve();
+      } catch(e) {
+        console.warn('Sanitized build failed, trying static pose:', e.message);
+        // Fallback: strip ALL animations, just show static pose
+        try {
+          const staticData = JSON.parse(JSON.stringify(skelData));
+          staticData.animations = {};
+          buildSpine(staticData);
+          resolve();
+        } catch(e2) {
+          console.error('Spine construction fully failed:', e2);
+          reject(e2);
+        }
+      }
+    }
+
+    // If no textures referenced, finish immediately
+    if (texturesLoading === 0) setTimeout(finishLoad, 100);
+  });
+}
+
+function loadSpineViaLoader(name) {
+  return new Promise((resolve, reject) => {
+    // Use PIXI.Loader (works with pixi-spine auto-plugin)
+    const loader = new PIXI.Loader();
+    const key = 'spine_' + name + '_' + Date.now();
+    loader.add(key, `/api/skeleton/${name}`, {
+      metadata: {
+        spineAtlasFile: `/api/atlas/${name}`,
+      }
+    });
+    loader.load((_, resources) => {
+      try {
+        const res = resources[key];
+        if (!res || !res.spineData) throw new Error('Failed to load spine data via loader');
+        currentSpine = new PIXI.spine.Spine(res.spineData);
+        const cw = pixiApp.renderer.width, ch = pixiApp.renderer.height;
+        currentSpine.x = cw / 2;
+        currentSpine.y = ch * 0.8;
+        pixiApp.stage.addChild(currentSpine);
+        const bounds = currentSpine.getLocalBounds();
+        const scale = Math.min(cw * 0.8 / (bounds.width||300), ch * 0.7 / (bounds.height||300), 1.5);
+        currentSpine.scale.set(scale, scale);
+        currentSpine.y = ch * 0.85;
+        resolve();
+      } catch(e) { reject(e); }
+    });
+    loader.onError.add((err) => reject(err));
+  });
+}
+
+function showSkeletonInfo(data) {
+  const container = document.getElementById('canvasContainer');
+  container.innerHTML = `<div style="padding:40px;color:var(--text-secondary);font-size:13px;max-height:100%;overflow:auto">
+    <h3 style="color:var(--text-primary);margin-bottom:16px">骨骼结构 (无纹理预览)</h3>
+    <pre style="font-family:monospace;line-height:1.6">${JSON.stringify(data.bones?.slice(0,30), null, 2)}</pre>
+  </div>`;
+}
+
+// ─── 动画控制 ───
+function playAnimation() {
+  if (!currentSpine) return;
+  const anim = document.getElementById('animSelect').value;
+  if (!anim) return;
+  try {
+    currentSpine.state.setAnimation(0, anim, isLooping);
+    currentSpine.state.timeScale = playSpeed;
+  } catch(e) { console.warn('Animation error:', e); }
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  const btn = document.getElementById('btnPlay');
+  btn.textContent = isPlaying ? '▶ 播放' : '⏸ 暂停';
+  btn.classList.toggle('active', isPlaying);
+  if (currentSpine) currentSpine.state.timeScale = isPlaying ? playSpeed : 0;
+}
+
+function toggleLoop() {
+  isLooping = !isLooping;
+  event.target.classList.toggle('active');
+  if (currentSpine) {
+    const cur = currentSpine.state.getCurrent(0);
+    if (cur) cur.loop = isLooping;
+  }
+}
+
+function setSpeed(val) {
+  playSpeed = parseFloat(val);
+  document.getElementById('speedLabel').textContent = playSpeed.toFixed(1) + 'x';
+  if (currentSpine && isPlaying) currentSpine.state.timeScale = playSpeed;
+}
+
+// ─── 快捷键 ───
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowDown') {
+    e.preventDefault();
+    const sel = document.getElementById('animSelect');
+    if (sel.selectedIndex < sel.options.length - 1) { sel.selectedIndex++; playAnimation(); }
+  }
+  if (e.code === 'ArrowUp') {
+    e.preventDefault();
+    const sel = document.getElementById('animSelect');
+    if (sel.selectedIndex > 0) { sel.selectedIndex--; playAnimation(); }
+  }
+});
+</script>
+</body>
+</html>
