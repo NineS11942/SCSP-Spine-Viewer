@@ -150,6 +150,27 @@ body {
   transform: translateY(-1px);
 }
 
+.header-links .github-btn {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #333, #555);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+  text-decoration: none;
+}
+
+.header-links .github-btn:hover {
+  background: linear-gradient(135deg, #555, #777);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(255,255,255,0.15);
+  color: #fff;
+}
+
 .header-links .qq-btn {
   padding: 6px 14px;
   background: linear-gradient(135deg, #12b7f5, #0d8bd9);
@@ -167,6 +188,24 @@ body {
   background: linear-gradient(135deg, #0d8bd9, #0a6fb5);
   transform: translateY(-1px);
   box-shadow: 0 3px 12px rgba(18,183,245,0.35);
+}
+
+.btn-export {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-export:hover {
+  background: linear-gradient(135deg, #f5576c, #f093fb);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(245,87,108,0.3);
 }
 
 /* ─── Sidebar ─── */
@@ -396,7 +435,7 @@ body {
     <span class="status" id="status"></span>
     <div class="header-links">
       <button class="extract-btn" onclick="launchExtractor()" title="自动从 data.pack 解包模型文件">📦 没有模型文件? 点我获取</button>
-      <a href="https://github.com/NineS11942/SCSP-Spine-Viewer" target="_blank">⭐ GitHub</a>
+      <a class="github-btn" href="https://github.com/NineS11942/SCSP-Spine-Viewer" target="_blank">⭐ GitHub</a>
       <button class="qq-btn" onclick="navigator.clipboard.writeText('777529227');this.textContent='✅ 已复制!';setTimeout(()=>this.textContent='💬 QQ群: 777529227',2000)" title="点击复制群号">💬 QQ群: 777529227</button>
     </div>
   </div>
@@ -437,6 +476,7 @@ body {
         <input type="range" id="speedRange" min="0.1" max="3" step="0.1" value="1" oninput="setSpeed(this.value)" />
         <span id="speedLabel">1.0x</span>
       </div>
+      <button class="btn-export" onclick="exportJSON()" title="导出当前模型的 Spine JSON">📥 导出 JSON</button>
       <div class="info-bar" id="infoBar"></div>
     </div>
   </div>
@@ -838,6 +878,25 @@ async function launchExtractor() {
   } catch(e) {
     setStatus('启动解包工具失败: ' + e.message, 'err');
   }
+}
+
+// ─── 导出 JSON ───
+function exportJSON() {
+  if (!currentModel || !cachedSkelData) {
+    setStatus('请先选择一个模型', 'err');
+    return;
+  }
+  const jsonStr = JSON.stringify(cachedSkelData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentModel + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setStatus(`已导出 ${currentModel}.json`, 'ok');
 }
 </script>
 </body>

@@ -225,9 +225,70 @@ if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()
     import webbrowser
+    import socket
+    import subprocess
+
+    EXE_NAME = "SCSP_Spine_Viewer.exe"
+
+    # ──── 检测并结束旧实例 ────
+    def kill_old_instances():
+        """检测并结束旧的 SCSP_Spine_Viewer.exe 进程"""
+        my_pid = os.getpid()
+        killed = False
+        try:
+            # 用 tasklist 查找同名进程
+            result = subprocess.run(
+                ['tasklist', '/FI', f'IMAGENAME eq {EXE_NAME}', '/FO', 'CSV', '/NH'],
+                capture_output=True, text=True, creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
+            for line in result.stdout.strip().split('\n'):
+                line = line.strip().strip('"')
+                if not line or EXE_NAME.lower() not in line.lower():
+                    continue
+                parts = line.split('","')
+                if len(parts) >= 2:
+                    try:
+                        pid = int(parts[1].strip('"'))
+                        if pid != my_pid:
+                            subprocess.run(
+                                ['taskkill', '/F', '/PID', str(pid)],
+                                capture_output=True, creationflags=0x08000000
+                            )
+                            killed = True
+                    except (ValueError, IndexError):
+                        continue
+        except Exception:
+            pass
+
+        # 也检测端口 5000 是否被占用
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1)
+            s.connect(('127.0.0.1', 5000))
+            s.close()
+            # 端口被占用，尝试释放
+            if not killed:
+                subprocess.run(
+                    ['powershell', '-Command',
+                     f"Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue | "
+                     f"ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}"],
+                    capture_output=True, creationflags=0x08000000
+                )
+                killed = True
+        except (ConnectionRefusedError, OSError):
+            pass  # 端口没被占用，正常
+
+        if killed:
+            print("⚠ 检测到旧程序还在运行，已自动结束")
+            import time
+            time.sleep(0.5)  # 等待端口释放
+
+        return killed
+
+    kill_old_instances()
 
     print("\n" + "="*50)
-    print("  SCSP Spine Viewer")
+    print("  SCSP Spine Viewer v1.05")
     print("  http://localhost:5000")
     print("="*50 + "\n")
 
@@ -236,7 +297,12 @@ if __name__ == '__main__':
 
     try:
         app.run(host='0.0.0.0', port=5000, debug=False)
+    except OSError as e:
+        if 'address already in use' in str(e).lower() or '10048' in str(e):
+            print(f"\n[ERROR] 端口 5000 被占用！请关闭占用该端口的程序后重试。")
+        else:
+            print(f"\n[ERROR] {e}")
+        input("按回车键退出...")
     except Exception as e:
         print(f"\n[ERROR] {e}")
         input("按回车键退出...")
-

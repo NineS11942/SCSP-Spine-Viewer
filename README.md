@@ -58,7 +58,7 @@ python spine_viewer.py
 
 ### 打包为 EXE
 
-运行 `N_build.bat`，使用 Nuitka 编译为单文件可执行程序。
+运行 `N_build.bat`，使用 pyinstaller打包 编译为单文件可执行程序。
 
 ---
 
@@ -68,8 +68,11 @@ python spine_viewer.py
 |------|------|
 | `spine_viewer.py` | Flask 后端：SCT2 纹理解码 + REST API |
 | `scsp_decoder.py` | SCSP 二进制解析器：LZ4 解压 + Spine JSON 结构映射 |
+| `model_extractor.py` | 模型解包 GUI：从 data.pack 提取 Spine 模型文件 |
 | `index.html` | 前端页面：PixiJS 5 + pixi-spine 2.x 渲染引擎 |
-| `N_build.bat` | Nuitka 一键打包脚本 |
+| `N_build.bat` | PyInstaller 一键打包脚本 |
+| `release.bat` | GitHub Release 发布脚本 |
+| `CHANGELOG.md` | 版本更新日志 |
 
 ---
 
@@ -121,9 +124,18 @@ SCT2 Header (72 bytes)
 
 ---
 
+## ⚠ 免责声明
+
+- 本项目仅供**学习研究与技术交流**使用，不得用于任何商业用途
+- 本工具不包含、不分发任何游戏资源文件，所有资源需用户自行从本地客户端获取
+- 本项目与游戏官方无任何关联，所有游戏资源版权归原公司所有
+- **如有侵权，请联系删除**，收到通知后将第一时间配合处理
+
+---
+
 ## 📄 License
 
-MIT License
+[MIT License](LICENSE)
 
 ---
 

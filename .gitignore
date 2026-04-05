@@ -1,7 +1,12 @@
 *.bat
 *.exe
 *.zip
+!SCSP_Spine_Viewer_*.zip
 __pycache__/
 *.build/
 *.dist/
 *.onefile-build/
+*.spec
+build/
+dist/
+nuitka-crash-report.xml
