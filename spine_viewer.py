@@ -9,6 +9,7 @@ import json
 import struct
 import io
 import glob
+import threading
 from flask import Flask, jsonify, send_file, request, Response
 import lz4.block
 
@@ -83,8 +84,9 @@ def decode_sct2(filepath):
 
 @app.route('/')
 def index():
-    # 兼容 Nuitka onefile / PyInstaller / 普通运行
-    for base in [os.path.dirname(sys.executable), os.path.dirname(__file__), os.getcwd()]:
+    # 兼容 PyInstaller / Nuitka onefile / 普通运行
+    search = [getattr(sys, '_MEIPASS', ''), os.path.dirname(sys.executable), os.path.dirname(__file__), os.getcwd()]
+    for base in search:
         p = os.path.join(base, 'index.html')
         if os.path.exists(p):
             return send_file(p, mimetype='text/html')
@@ -200,25 +202,29 @@ def get_texture(name):
     return "Texture not found", 404
 
 
+def _extractor_process():
+    """在独立进程中运行模型解包 GUI"""
+    import model_extractor
+    gui = model_extractor.ModelExtractorApp()
+    gui.mainloop()
+
+
 @app.route('/api/launch_extractor', methods=['POST'])
 def launch_extractor():
-    """启动模型解包 GUI"""
-    import subprocess
-    script = os.path.join(os.path.dirname(__file__), 'model_extractor.py')
-    if not os.path.exists(script):
-        # 尝试 exe 同目录
-        script = os.path.join(os.path.dirname(sys.executable), 'model_extractor.py')
-    if not os.path.exists(script):
-        return jsonify({'ok': False, 'error': 'model_extractor.py not found'})
+    """启动模型解包 GUI (独立进程，兼容 Nuitka onefile)"""
     try:
-        subprocess.Popen([sys.executable, script], cwd=os.path.dirname(script))
+        import multiprocessing
+        p = multiprocessing.Process(target=_extractor_process, daemon=True)
+        p.start()
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
 
 if __name__ == '__main__':
-    import webbrowser, threading
+    import multiprocessing
+    multiprocessing.freeze_support()
+    import webbrowser
 
     print("\n" + "="*50)
     print("  SCSP Spine Viewer")

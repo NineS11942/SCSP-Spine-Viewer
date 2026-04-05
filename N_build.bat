@@ -1,19 +1,19 @@
 @echo off
 chcp 65001 >nul
-title SCSP Spine Viewer - Nuitka Build
+title SCSP Spine Viewer - PyInstaller Build
 
 echo ==================================================
-echo   SCSP Spine Viewer - Nuitka Build
+echo   SCSP Spine Viewer - PyInstaller Build
 echo ==================================================
 echo.
 
-:: Check Nuitka
-where nuitka >nul 2>&1
+:: Check PyInstaller
+where pyinstaller >nul 2>&1
 if errorlevel 1 (
-    echo [!] Nuitka not found, installing...
-    pip install nuitka ordered-set zstandard
+    echo [!] PyInstaller not found, installing...
+    pip install pyinstaller
     if errorlevel 1 (
-        echo [ERROR] Nuitka install failed
+        echo [ERROR] PyInstaller install failed
         pause
         exit /b 1
     )
@@ -21,41 +21,44 @@ if errorlevel 1 (
 
 :: Clean old builds
 echo [1/3] Cleaning old builds...
-if exist spine_viewer.dist rmdir /s /q spine_viewer.dist
-if exist spine_viewer.build rmdir /s /q spine_viewer.build
-if exist spine_viewer.onefile-build rmdir /s /q spine_viewer.onefile-build
+if exist dist rmdir /s /q dist
+if exist build rmdir /s /q build
+if exist *.spec del /f /q *.spec
 
 :: Build
-echo [2/3] Nuitka compiling (may take a few minutes)...
-python -m nuitka ^
+echo [2/3] PyInstaller packaging...
+pyinstaller ^
     --onefile ^
-    --standalone ^
-    --output-filename=SCSP_Spine_Viewer.exe ^
-    --include-data-file=index.html=index.html ^
-    --include-data-file=scsp_decoder.py=scsp_decoder.py ^
-    --include-data-file=model_extractor.py=model_extractor.py ^
-    --include-package=lz4 ^
-    --include-package=texture2ddecoder ^
-    --include-package=PIL ^
-    --include-package=numpy ^
-    --include-package=flask ^
-    --include-module=scsp_decoder ^
-    --enable-plugin=numpy ^
-    --assume-yes-for-downloads ^
-    --windows-console-mode=force ^
+    --name SCSP_Spine_Viewer ^
+    --add-data "index.html;." ^
+    --hidden-import=scsp_decoder ^
+    --hidden-import=model_extractor ^
+    --hidden-import=lz4 ^
+    --hidden-import=lz4.block ^
+    --hidden-import=texture2ddecoder ^
+    --hidden-import=PIL ^
+    --hidden-import=numpy ^
+    --hidden-import=flask ^
+    --hidden-import=customtkinter ^
+    --collect-all customtkinter ^
+    --console ^
     spine_viewer.py
 
 if errorlevel 1 (
     echo.
-    echo [ERROR] Nuitka build failed!
+    echo [ERROR] PyInstaller build failed!
     pause
     exit /b 1
 )
 
+:: Move exe to root
+echo [3/3] Moving output...
+move /Y dist\SCSP_Spine_Viewer.exe SCSP_Spine_Viewer.exe
+
 :: Cleanup
-echo [3/3] Cleaning up...
-if exist spine_viewer.build rmdir /s /q spine_viewer.build
-if exist spine_viewer.onefile-build rmdir /s /q spine_viewer.onefile-build
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
+if exist *.spec del /f /q *.spec
 
 echo.
 echo ==================================================
