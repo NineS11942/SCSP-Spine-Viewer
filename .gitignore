@@ -1,7 +1,7 @@
 *.bat
 *.exe
 *.zip
-!SCSP_Spine_Viewer_*.zip
+!SCSP_Spine_Viewer*.zip
 __pycache__/
 *.build/
 *.dist/
