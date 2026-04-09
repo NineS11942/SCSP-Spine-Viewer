@@ -442,8 +442,13 @@ body {
 
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="sidebar-search">
-      <input type="text" id="searchInput" placeholder="🔍 搜索模型..." oninput="filterModels()" />
+    <div class="sidebar-search" style="display:flex;gap:8px;">
+      <input type="text" id="searchInput" placeholder="🔍 搜索..." oninput="filterModels()" style="flex:1" />
+      <select id="typeFilter" onchange="filterModels()" style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);outline:none;padding:8px 8px;font-size:12px;width:80px;">
+        <option value="all">全部</option>
+        <option value="model">模型</option>
+        <option value="image">图片</option>
+      </select>
     </div>
     <div class="model-list" id="modelList">
       <div class="placeholder" style="padding:40px 20px">
@@ -477,6 +482,7 @@ body {
         <span id="speedLabel">1.0x</span>
       </div>
       <button class="btn-export" onclick="exportJSON()" title="导出当前模型的 Spine JSON">📥 导出 JSON</button>
+      <button class="btn" style="background:linear-gradient(135deg, #00b894, #00cec9);color:#fff;border:none;" onclick="viewPNG()" title="新标签页看大图">🖼️ 查看 PNG</button>
       <div class="info-bar" id="infoBar"></div>
     </div>
   </div>
@@ -530,22 +536,29 @@ function setStatus(text, cls) {
 function renderModelList(models) {
   const el = document.getElementById('modelList');
   if (!models.length) {
-    el.innerHTML = '<div class="placeholder" style="padding:40px 20px"><p>没有找到 .scsp 文件</p></div>';
+    el.innerHTML = '<div class="placeholder" style="padding:40px 20px"><p>没有找到文件</p></div>';
     return;
   }
   el.innerHTML = models.map(m => {
     const dotCls = (m.hasAtlas && m.hasTexture) ? '' : m.hasAtlas || m.hasTexture ? 'partial' : 'missing';
     const activeCls = currentModel === m.name ? 'active' : '';
+    const typeLabel = m.type === 'model' ? '<span style="font-size:10px;color:#a29bfe;border:1px solid #a29bfe;border-radius:4px;padding:2px 4px;margin-left:auto;">模型</span>' : '<span style="font-size:10px;color:#00d2a0;border:1px solid #00d2a0;border-radius:4px;padding:2px 4px;margin-left:auto;">图片</span>';
     return `<div class="model-item ${activeCls}" onclick="selectModel('${m.name}')" data-name="${m.name}">
       <span class="dot ${dotCls}"></span>
-      <span>${m.name}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</span>
+      ${typeLabel}
     </div>`;
   }).join('');
 }
 
 function filterModels() {
   const q = document.getElementById('searchInput').value.toLowerCase();
-  const filtered = allModels.filter(m => m.name.toLowerCase().includes(q));
+  const typeSelection = document.getElementById('typeFilter').value;
+  const filtered = allModels.filter(m => {
+    const matchName = !q || m.name.toLowerCase().includes(q);
+    const matchType = typeSelection === 'all' || m.type === typeSelection;
+    return matchName && matchType;
+  });
   renderModelList(filtered);
 }
 
@@ -553,17 +566,62 @@ function filterModels() {
 async function selectModel(name) {
   if (currentModel === name) return;
   currentModel = name;
+  const modelInfo = allModels.find(m => m.name === name);
+  const mType = modelInfo ? modelInfo.type : 'model';
+
   renderModelList(allModels.filter(m => {
     const q = document.getElementById('searchInput').value.toLowerCase();
-    return !q || m.name.toLowerCase().includes(q);
+    const t = document.getElementById('typeFilter').value;
+    return (!q || m.name.toLowerCase().includes(q)) && (t === 'all' || m.type === t);
   }));
   document.getElementById('loading').classList.remove('hidden');
   const vp = document.getElementById('viewerPlaceholder');
   if (vp) vp.classList.add('hidden');
+  const skelInfo = document.getElementById('skeletonInfo');
+  if (skelInfo) skelInfo.style.display = 'none';
   setStatus(`加载 ${name}...`, '');
+
+  if (mType === 'image') {
+    if (pixiApp && currentSpine) {
+      currentSpine.visible = false;
+    }
+    const container = document.getElementById('canvasContainer');
+    let imgView = document.getElementById('imageView');
+    if (!imgView) {
+      imgView = document.createElement('img');
+      imgView.id = 'imageView';
+      imgView.style.maxWidth = '100%';
+      imgView.style.maxHeight = '100%';
+      imgView.style.objectFit = 'contain';
+      imgView.style.position = 'absolute';
+      imgView.style.top = '50%';
+      imgView.style.left = '50%';
+      imgView.style.transform = 'translate(-50%, -50%)';
+      container.appendChild(imgView);
+    }
+    imgView.style.display = 'block';
+    if (pixiApp && pixiApp.view) pixiApp.view.style.display = 'none';
+    
+    imgView.onload = () => {
+      document.getElementById('loading').classList.add('hidden');
+      setStatus(`${name} 加载完成`, 'ok');
+      document.getElementById('infoBar').textContent = `图片尺寸: ${imgView.naturalWidth} x ${imgView.naturalHeight}`;
+    };
+    imgView.onerror = () => {
+      document.getElementById('loading').classList.add('hidden');
+      setStatus(`图片加载失败: ${name}`, 'err');
+    };
+    imgView.src = `/api/texture/${name}.png?t=${Date.now()}`;
+    document.getElementById('animSelect').innerHTML = '';
+    return;
+  }
 
   try {
     if (!pixiApp) initPixi();
+    if (pixiApp && pixiApp.view) pixiApp.view.style.display = 'block';
+    const imgView = document.getElementById('imageView');
+    if (imgView) imgView.style.display = 'none';
+
     if (currentSpine) {
       pixiApp.stage.removeChild(currentSpine);
       currentSpine.destroy();
@@ -809,10 +867,19 @@ function loadSpineViaLoader(name) {
 
 function showSkeletonInfo(data) {
   const container = document.getElementById('canvasContainer');
-  container.innerHTML = `<div style="padding:40px;color:var(--text-secondary);font-size:13px;max-height:100%;overflow:auto">
+  let infoDiv = document.getElementById('skeletonInfo');
+  if (!infoDiv) {
+    infoDiv = document.createElement('div');
+    infoDiv.id = 'skeletonInfo';
+    infoDiv.style.cssText = "position:absolute;top:0;left:0;right:0;bottom:0;padding:40px;color:var(--text-secondary);font-size:13px;overflow:auto;background:var(--bg-panel);z-index:10;";
+    container.appendChild(infoDiv);
+  }
+  infoDiv.innerHTML = `
     <h3 style="color:var(--text-primary);margin-bottom:16px">骨骼结构 (无纹理预览)</h3>
     <pre style="font-family:monospace;line-height:1.6">${JSON.stringify(data.bones?.slice(0,30), null, 2)}</pre>
-  </div>`;
+  `;
+  infoDiv.style.display = 'block';
+  if (pixiApp && pixiApp.view) pixiApp.view.style.display = 'none';
 }
 
 // ─── 动画控制 ───
@@ -897,6 +964,14 @@ function exportJSON() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   setStatus(`已导出 ${currentModel}.json`, 'ok');
+}
+
+function viewPNG() {
+  if (!currentModel) {
+    setStatus('请先选择一个模型或图片', 'err');
+    return;
+  }
+  window.open('/api/texture/' + currentModel + '.png', '_blank');
 }
 </script>
 </body>

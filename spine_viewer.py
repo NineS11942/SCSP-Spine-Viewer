@@ -45,16 +45,26 @@ def decode_sct2(filepath):
     if w == 0 or h == 0 or w > 16384 or h > 16384:
         raise ValueError(f"Invalid SCT2 dimensions: {w}x{h}")
 
-    # ── LZ4 decompress payload ──
+    # ── Decompress payload (LZ4 or raw) ──
     payload   = data[header_size:]
     dec_size  = struct.unpack_from('<I', payload, 0)[0]
     comp_size = struct.unpack_from('<I', payload, 4)[0]
-    raw = lz4.block.decompress(payload[8:8+comp_size], uncompressed_size=dec_size)
+    
+    if 0 < comp_size < len(payload) and 0 < dec_size < 100_000_000:
+        # Standard LZ4 compressed payload
+        raw = lz4.block.decompress(payload[8:8+comp_size], uncompressed_size=dec_size)
+    else:
+        # Raw texture data (no LZ4) — face textures etc.
+        raw = payload
 
     # ── Decode GPU texture based on detail field ──
     if detail == 40:
         # ASTC 4×4 compressed
         rgba = texture2ddecoder.decode_astc(raw, w, h, 4, 4)
+        img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
+    elif detail == 47:
+        # ASTC 8×8 compressed
+        rgba = texture2ddecoder.decode_astc(raw, w, h, 8, 8)
         img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
     elif detail == 19:
         # ETC2 RGBA8 (EAC) compressed
@@ -67,13 +77,26 @@ def decode_sct2(filepath):
         else:
             raise ValueError(f"detail=44 raw data too short: {len(raw)} < {w*h*4}")
     else:
-        # Unknown detail — try ASTC 4x4 first, then ETC2A8
-        try:
-            rgba = texture2ddecoder.decode_astc(raw, w, h, 4, 4)
-            img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
-        except Exception:
-            rgba = texture2ddecoder.decode_etc2a8(raw, w, h)
-            img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
+        # Unknown detail — auto-detect ASTC block size by matching data length
+        img = None
+        astc_sizes = [(4,4), (5,5), (6,6), (8,8), (10,10), (12,12)]
+        for bw, bh in astc_sizes:
+            expected = ((w + bw - 1) // bw) * ((h + bh - 1) // bh) * 16
+            if expected == len(raw):
+                try:
+                    rgba = texture2ddecoder.decode_astc(raw, w, h, bw, bh)
+                    img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
+                    break
+                except Exception:
+                    continue
+        if img is None:
+            # Fallback: try ETC2A8, then ASTC 4x4
+            try:
+                rgba = texture2ddecoder.decode_etc2a8(raw, w, h)
+                img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
+            except Exception:
+                rgba = texture2ddecoder.decode_astc(raw, w, h, 4, 4)
+                img = Image.frombytes('RGBA', (w, h), rgba, 'raw', 'BGRA')
 
     buf = io.BytesIO()
     img.save(buf, format='PNG')
@@ -110,18 +133,38 @@ def list_models():
     if not _model_dir:
         return jsonify({"models": [], "error": "No folder set"})
     
-    scsp_files = glob.glob(os.path.join(_model_dir, "*.scsp"))
+    try:
+        files = os.listdir(_model_dir)
+    except Exception as e:
+        return jsonify({"models": [], "error": str(e)})
+        
+    items = {}
+    for f in files:
+        if os.path.isfile(os.path.join(_model_dir, f)):
+            base, ext = os.path.splitext(f)
+            ext = ext.lower()
+            if ext in ['.scsp', '.sct', '.sct2', '.png', '.atlas']:
+                if base not in items:
+                    items[base] = {'scsp': False, 'tex': False, 'atlas': False}
+                if ext == '.scsp':
+                    items[base]['scsp'] = True
+                elif ext == '.atlas':
+                    items[base]['atlas'] = True
+                elif ext in ['.sct', '.sct2', '.png']:
+                    items[base]['tex'] = True
+
     models = []
-    for f in sorted(scsp_files):
-        name = os.path.splitext(os.path.basename(f))[0]
-        atlas_exists = os.path.exists(os.path.join(_model_dir, f"{name}.atlas"))
-        tex_exists = (os.path.exists(os.path.join(_model_dir, f"{name}.sct")) or
-                      os.path.exists(os.path.join(_model_dir, f"{name}.sct2")) or
-                      os.path.exists(os.path.join(_model_dir, f"{name}.png")))
+    for name in sorted(items.keys()):
+        item = items[name]
+        has_skel = item['scsp']
+        has_tex = item['tex']
+        if not has_skel and not has_tex:
+            continue
         models.append({
             "name": name,
-            "hasAtlas": atlas_exists,
-            "hasTexture": tex_exists,
+            "hasAtlas": item['atlas'],
+            "hasTexture": has_tex,
+            "type": "model" if has_skel else "image"
         })
     return jsonify({"models": models, "folder": _model_dir})
 
@@ -184,22 +227,49 @@ def get_texture(name):
     if not _model_dir:
         return "No folder set", 400
     
-    # 优先找 PNG
-    png_path = os.path.join(_model_dir, f"{name}.png")
-    if os.path.exists(png_path):
-        return send_file(png_path, mimetype='image/png')
+    def _find_texture(name):
+        """在 _model_dir 及其父级/兄弟目录中搜索纹理文件"""
+        # 1) 当前目录
+        for ext in ['.png', '.sct', '.sct2']:
+            p = os.path.join(_model_dir, f"{name}{ext}")
+            if os.path.exists(p):
+                return p
+        
+        # 2) 向上搜索父目录和兄弟目录 (最多向上2级)
+        search_root = _model_dir
+        for _ in range(2):
+            parent = os.path.dirname(search_root)
+            if parent == search_root:
+                break
+            # 搜索父目录下所有子目录 (深度2)
+            for root, dirs, files in os.walk(parent):
+                depth = root.replace(parent, '').count(os.sep)
+                if depth > 2:
+                    dirs.clear()
+                    continue
+                for ext in ['.png', '.sct', '.sct2']:
+                    if f"{name}{ext}" in files:
+                        return os.path.join(root, f"{name}{ext}")
+            search_root = parent
+        
+        return None
     
-    # 然后找 SCT/SCT2
-    for ext in ['.sct', '.sct2']:
-        sct_path = os.path.join(_model_dir, f"{name}{ext}")
-        if os.path.exists(sct_path):
-            try:
-                png_data = decode_sct2(sct_path)
-                return Response(png_data, mimetype='image/png')
-            except Exception as e:
-                return f"Texture decode error: {e}", 500
+    found = _find_texture(name)
+    if not found:
+        return "Texture not found", 404
     
-    return "Texture not found", 404
+    ext = os.path.splitext(found)[1].lower()
+    
+    # PNG 直接发送
+    if ext == '.png':
+        return send_file(found, mimetype='image/png')
+    
+    # SCT/SCT2 解码为 PNG
+    try:
+        png_data = decode_sct2(found)
+        return Response(png_data, mimetype='image/png')
+    except Exception as e:
+        return f"Texture decode error ({os.path.basename(found)}): {e}", 500
 
 
 def _extractor_process():
