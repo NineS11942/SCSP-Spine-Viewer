@@ -1,12 +1,22 @@
-*.bat
-*.exe
-*.zip
+# 白名单模式：默认忽略一切
+*
+
+# 允许根目录文件
+!.gitignore
+!README.md
+!*.py
+!*.html
+!*.css
+!*.js
+!*.exe
 !SCSP_Spine_Viewer*.zip
+
+# 允许 v0/ 和 v1/ 目录
+!v0/
+!v0/**
+!v1/
+!v1/**
+
+# 在白名单目录中仍然排除的内容
 __pycache__/
-*.build/
-*.dist/
-*.onefile-build/
-*.spec
-build/
-dist/
-nuitka-crash-report.xml
+*.pyc

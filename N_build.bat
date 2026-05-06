@@ -31,8 +31,18 @@ pyinstaller ^
     --onefile ^
     --name SCSP_Spine_Viewer ^
     --add-data "index.html;." ^
-    --hidden-import=scsp_decoder ^
-    --hidden-import=model_extractor ^
+    --add-data "spine_test.html;." ^
+    --add-data "static;static" ^
+    --hidden-import=v1 ^
+    --hidden-import=v1.scsp_common ^
+    --hidden-import=v1.scsp_v2 ^
+    --hidden-import=v1.scsp_v3 ^
+    --hidden-import=v1.scsp2json ^
+    --hidden-import=v0 ^
+    --hidden-import=v0.scsp_v3_parser ^
+    --hidden-import=v0.model_extractor ^
+    --hidden-import=v0.png_to_sct ^
+    --hidden-import=v0.pack_repacker ^
     --hidden-import=lz4 ^
     --hidden-import=lz4.block ^
     --hidden-import=texture2ddecoder ^

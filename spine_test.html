@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spine Canvas 3.8 对比测试</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; }
+  #header { padding: 12px 20px; background: #16213e; display: flex; align-items: center; gap: 16px; }
+  #header h2 { font-size: 16px; color: #e94560; }
+  #controls { display: flex; gap: 8px; align-items: center; }
+  select, button { padding: 6px 12px; border: 1px solid #444; border-radius: 4px; background: #0f3460; color: #eee; font-size: 13px; cursor: pointer; }
+  button:hover { background: #e94560; }
+  #status { margin-left: auto; font-size: 12px; color: #888; }
+  canvas { display: block; background: #111; }
+</style>
+</head>
+<body>
+<div id="header">
+  <h2>🦴 Spine Canvas 3.8 官方运行时 — 对比测试</h2>
+  <div id="controls">
+    <select id="animSelect"><option>-- 加载模型后选择动画 --</option></select>
+    <button id="playBtn">▶ Play</button>
+  </div>
+  <div id="status">就绪</div>
+</div>
+<canvas id="canvas"></canvas>
+
+<script src="/static/spine-canvas.js"></script>
+<script>
+(function() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const animSelect = document.getElementById('animSelect');
+  const statusEl = document.getElementById('status');
+  const playBtn = document.getElementById('playBtn');
+
+  let skeleton = null;
+  let animState = null;
+  let lastTime = 0;
+  let playing = false;
+  let bounds = null;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 50;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function status(msg) { statusEl.textContent = msg; }
+
+  // Get model name from URL params, e.g. ?model=byblis
+  const params = new URLSearchParams(location.search);
+  const modelName = params.get('model');
+  if (!modelName) {
+    status('请在 URL 中指定 ?model=模型名');
+  } else {
+    status('正在加载: ' + modelName);
+    loadModel(modelName);
+  }
+
+  async function loadModel(name) {
+    try {
+      // 1. Fetch skeleton JSON
+      status('加载骨骼数据...');
+      const skelResp = await fetch('/api/skeleton/' + name);
+      if (!skelResp.ok) throw new Error('Skeleton load failed: ' + skelResp.status);
+      const skelJson = await skelResp.json();
+      status('骨骼加载完成 (bones:' + (skelJson.bones||[]).length + ')');
+
+      // 2. Fetch atlas
+      status('加载 Atlas...');
+      const atlasResp = await fetch('/api/atlas/' + name);
+      if (!atlasResp.ok) throw new Error('Atlas load failed: ' + atlasResp.status);
+      const atlasText = await atlasResp.text();
+
+      // 3. Parse atlas to get texture names
+      const texNames = [];
+      for (const line of atlasText.split('\n')) {
+        const t = line.trim();
+        if (t.endsWith('.png')) {
+          texNames.push(t);
+        }
+      }
+      status('Atlas 解析完成, 纹理: ' + texNames.join(', '));
+
+      // 4. Load textures as Image → canvas-based fake TextureAtlas
+      const images = {};
+      await Promise.all(texNames.map(texPath => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => { images[texPath] = img; resolve(); };
+        img.onerror = () => {
+          console.warn('Texture fail:', texPath);
+          const c = document.createElement('canvas'); c.width = 2; c.height = 2;
+          images[texPath] = c;
+          resolve();
+        };
+        const texName = texPath.replace(/\.png$/, '');
+        img.src = '/api/texture/' + texName + '.png';
+      })));
+      status('纹理加载完成');
+
+      // 5. Create TextureAtlas
+      const atlas = new spine.TextureAtlas(atlasText, (path) => {
+        const img = images[path];
+        return new spine.canvas.CanvasTexture(img);
+      });
+
+      // 6. Create skeleton
+      const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
+      const skelParser = new spine.SkeletonJson(atlasLoader);
+      skelParser.scale = 1;
+      const skeletonData = skelParser.readSkeletonData(skelJson);
+
+      skeleton = new spine.Skeleton(skeletonData);
+      skeleton.setToSetupPose();
+      skeleton.updateWorldTransform();
+
+      // 7. Compute bounds
+      bounds = computeBounds(skeleton);
+      status('骨骼创建完成, 范围: ' + JSON.stringify(bounds));
+
+      // 8. Create animation state
+      const stateData = new spine.AnimationStateData(skeletonData);
+      stateData.defaultMix = 0.2;
+      animState = new spine.AnimationState(stateData);
+
+      // 9. Fill animation list
+      animSelect.innerHTML = '';
+      const anims = skeletonData.animations;
+      for (let i = 0; i < anims.length; i++) {
+        const opt = document.createElement('option');
+        opt.value = anims[i].name;
+        opt.textContent = anims[i].name;
+        animSelect.appendChild(opt);
+      }
+
+      // Auto-play first animation
+      if (anims.length > 0) {
+        // Prefer 'idle' or 'appear'
+        let defaultAnim = anims[0].name;
+        for (const a of anims) {
+          if (a.name === 'idle') { defaultAnim = 'idle'; break; }
+          if (a.name === 'appear') { defaultAnim = 'appear'; }
+        }
+        animSelect.value = defaultAnim;
+        animState.setAnimation(0, defaultAnim, true);
+        playing = true;
+        lastTime = performance.now() / 1000;
+        requestAnimationFrame(render);
+      }
+
+      status('✅ 渲染中 — Spine Canvas 3.8 官方运行时');
+    } catch (e) {
+      status('❌ 错误: ' + e.message);
+      console.error(e);
+    }
+  }
+
+  function computeBounds(skeleton) {
+    skeleton.setToSetupPose();
+    skeleton.updateWorldTransform();
+    const offset = new spine.Vector2();
+    const size = new spine.Vector2();
+    skeleton.getBounds(offset, size, []);
+    return {
+      x: offset.x, y: offset.y,
+      width: size.x, height: size.y
+    };
+  }
+
+  animSelect.addEventListener('change', () => {
+    if (!animState) return;
+    const name = animSelect.value;
+    animState.setAnimation(0, name, true);
+    if (!playing) {
+      playing = true;
+      lastTime = performance.now() / 1000;
+      requestAnimationFrame(render);
+    }
+  });
+
+  playBtn.addEventListener('click', () => {
+    if (!animState) return;
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+    if (playing) {
+      lastTime = performance.now() / 1000;
+      requestAnimationFrame(render);
+    }
+  });
+
+  function render(timestamp) {
+    if (!playing || !skeleton || !animState) return;
+
+    const now = timestamp / 1000;
+    const delta = now - lastTime;
+    lastTime = now;
+
+    // Update
+    animState.update(delta);
+    animState.apply(skeleton);
+    skeleton.updateWorldTransform();
+
+    // Clear
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Transform to center skeleton and flip Y axis to match Spine coordinates
+    ctx.translate(canvas.width / 2, canvas.height * 0.8);
+    ctx.scale(1, -1);
+
+    // Scale to fit
+    if (bounds) {
+      const scaleX = canvas.width / (bounds.width * 1.2);
+      const scaleY = (canvas.height * 0.85) / (bounds.height * 1.2);
+      const scale = Math.min(scaleX, scaleY, 1.5);
+      ctx.scale(scale, scale);
+    }
+
+    // Spine canvas renderer
+    const renderer = new spine.canvas.SkeletonRenderer(ctx);
+    renderer.debugRendering = false;
+    renderer.triangleRendering = true;
+    renderer.draw(skeleton);
+
+    ctx.restore();
+    requestAnimationFrame(render);
+  }
+})();
+</script>
+</body>
+</html>

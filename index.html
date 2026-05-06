@@ -150,6 +150,23 @@ body {
   transform: translateY(-1px);
 }
 
+.header-links .repack-btn {
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-links .repack-btn:hover {
+  background: linear-gradient(135deg, #5b4bd6, #918bef);
+  transform: translateY(-1px);
+}
+
 .header-links .github-btn {
   padding: 6px 14px;
   background: linear-gradient(135deg, #333, #555);
@@ -434,6 +451,7 @@ body {
     </div>
     <span class="status" id="status"></span>
     <div class="header-links">
+      <button class="repack-btn" onclick="launchRepacker()" title="启动 ChaosZero Toolkit 封包工具">📦 封包</button>
       <button class="extract-btn" onclick="launchExtractor()" title="自动从 data.pack 解包模型文件">📦 没有模型文件? 点我获取</button>
       <a class="github-btn" href="https://github.com/NineS11942/SCSP-Spine-Viewer" target="_blank">⭐ GitHub</a>
       <button class="qq-btn" onclick="navigator.clipboard.writeText('777529227');this.textContent='✅ 已复制!';setTimeout(()=>this.textContent='💬 QQ群: 777529227',2000)" title="点击复制群号">💬 QQ群: 777529227</button>
@@ -483,6 +501,7 @@ body {
       </div>
       <button class="btn-export" onclick="exportJSON()" title="导出当前模型的 Spine JSON">📥 导出 JSON</button>
       <button class="btn" style="background:linear-gradient(135deg, #00b894, #00cec9);color:#fff;border:none;" onclick="viewPNG()" title="新标签页看大图">🖼️ 查看 PNG</button>
+      <button class="btn" style="background:linear-gradient(135deg, #e17055, #fdcb6e);color:#fff;border:none;" onclick="launchPng2Sct()" title="将 PNG 图片转换为 SCT 纹理">🔄 PNG→SCT</button>
       <div class="info-bar" id="infoBar"></div>
     </div>
   </div>
@@ -539,16 +558,21 @@ function renderModelList(models) {
     el.innerHTML = '<div class="placeholder" style="padding:40px 20px"><p>没有找到文件</p></div>';
     return;
   }
-  el.innerHTML = models.map(m => {
+  el.innerHTML = models.map((m, i) => {
     const dotCls = (m.hasAtlas && m.hasTexture) ? '' : m.hasAtlas || m.hasTexture ? 'partial' : 'missing';
     const activeCls = currentModel === m.name ? 'active' : '';
     const typeLabel = m.type === 'model' ? '<span style="font-size:10px;color:#a29bfe;border:1px solid #a29bfe;border-radius:4px;padding:2px 4px;margin-left:auto;">模型</span>' : '<span style="font-size:10px;color:#00d2a0;border:1px solid #00d2a0;border-radius:4px;padding:2px 4px;margin-left:auto;">图片</span>';
-    return `<div class="model-item ${activeCls}" onclick="selectModel('${m.name}')" data-name="${m.name}">
+    // 用 data-idx 代替 inline onclick，避免文件名中的斜杠破坏引号
+    return `<div class="model-item ${activeCls}" data-idx="${i}" data-name="${m.name}">
       <span class="dot ${dotCls}"></span>
       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</span>
       ${typeLabel}
     </div>`;
   }).join('');
+  // 绑定点击事件
+  el.querySelectorAll('.model-item').forEach(item => {
+    item.addEventListener('click', () => selectModel(item.dataset.name));
+  });
 }
 
 function filterModels() {
@@ -564,7 +588,6 @@ function filterModels() {
 
 // ─── 模型加载 ───
 async function selectModel(name) {
-  if (currentModel === name) return;
   currentModel = name;
   const modelInfo = allModels.find(m => m.name === name);
   const mType = modelInfo ? modelInfo.type : 'model';
@@ -682,6 +705,50 @@ function initPixi() {
     pixiApp.renderer.resize(cw, ch);
     if (currentSpine) { currentSpine.x = cw / 2; currentSpine.y = ch * 0.85; }
   });
+  // ── 鼠标滚轮缩放 ──
+  container.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (!currentSpine) return;
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = currentSpine.scale.x * factor;
+    // 限制缩放范围 0.05x ~ 10x
+    if (newScale >= 0.05 && newScale <= 10) {
+      currentSpine.scale.set(newScale, newScale);
+    }
+  }, { passive: false });
+
+  // ── 鼠标拖动平移 ──
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let spineStartX = 0, spineStartY = 0;
+
+  container.addEventListener('mousedown', (e) => {
+    if (!currentSpine || e.button !== 0) return; // 仅左键
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    spineStartX = currentSpine.x;
+    spineStartY = currentSpine.y;
+    container.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging || !currentSpine) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    currentSpine.x = spineStartX + dx;
+    currentSpine.y = spineStartY + dy;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      container.style.cursor = '';
+    }
+  });
+
+  container.style.cursor = 'grab';
 }
 
 function loadSpineFromData(name, skelData, atlasText) {
@@ -742,8 +809,101 @@ function loadSpineFromData(name, skelData, atlasText) {
 
     function finishLoad() {
       // Sanitize skeleton JSON to fix SCSP decoder artifacts
-      function sanitize(data) {
+      function sanitize(data, atlasObj) {
         const d = JSON.parse(JSON.stringify(data));
+
+        // ── Fix 1: Ensure valid Spine version ──
+        if (d.skeleton) {
+          let ver = d.skeleton.spine || '';
+          // Strip .scsp suffix (SCSP decoder artifact)
+          ver = ver.replace(/\.scsp$/i, '');
+          // If version is empty or doesn't look like a version, force 3.8.75
+          if (!ver || !/^\d+\.\d+/.test(ver)) {
+            ver = '3.8.75';
+          }
+          d.skeleton.spine = ver;
+        }
+
+        // ── Fix 2: Clean bones — remove empty-named bones, fix parent refs ──
+        if (d.bones && Array.isArray(d.bones)) {
+          const validBoneNames = new Set();
+          // First pass: collect all valid bone names
+          for (const bone of d.bones) {
+            if (bone.name) validBoneNames.add(bone.name);
+          }
+          // Second pass: filter and fix
+          d.bones = d.bones.filter(bone => {
+            if (!bone.name) return false;  // remove empty-named bones
+            // Fix empty or missing parent references
+            if (bone.parent !== undefined && !bone.parent) {
+              // Empty parent string — set to 'root' if root exists, else remove parent
+              if (validBoneNames.has('root') && bone.name !== 'root') {
+                bone.parent = 'root';
+              } else {
+                delete bone.parent;  // make it a root bone
+              }
+            }
+            // Fix parent pointing to a non-existent bone
+            if (bone.parent && !validBoneNames.has(bone.parent)) {
+              if (validBoneNames.has('root') && bone.name !== 'root') {
+                bone.parent = 'root';
+              } else {
+                delete bone.parent;
+              }
+            }
+            return true;
+          });
+
+          if (d.slots && Array.isArray(d.slots)) {
+            d.slots = d.slots.filter(slot => {
+              if (!slot.name) return false;
+              if (slot.bone && !validBoneNames.has(slot.bone)) {
+                slot.bone = 'root';  // reparent to root
+              }
+              return true;
+            });
+          }
+        }
+
+        // ── Fix 3b: Strip skin attachment keys referencing nonexistent slots ──
+        if (d.skins && Array.isArray(d.skins) && d.slots) {
+          const validSlotNames = new Set(d.slots.map(s => s.name).filter(Boolean));
+          d.skins.forEach(skin => {
+            if (!skin.attachments) return;
+            for (const slotName in skin.attachments) {
+              if (!validSlotNames.has(slotName)) {
+                console.warn('Stripping skin attachments for nonexistent slot:', slotName);
+                delete skin.attachments[slotName];
+              }
+            }
+          });
+        }
+
+        // ── Fix 4: Strip attachments missing from Atlas ──
+        // Also track stripped attachments so we can clean deform animations
+        const strippedAttachments = []; // [{skinName, slotName, attName}]
+        if (d.skins && Array.isArray(d.skins) && atlasObj && typeof atlasObj.findRegion === 'function') {
+          d.skins.forEach(skin => {
+            if (!skin.attachments) return;
+            for (const slotName in skin.attachments) {
+              const slot = skin.attachments[slotName];
+              for (const attName in slot) {
+                const att = slot[attName];
+                const type = att.type || 'region';
+                if (type === 'region' || type === 'mesh' || type === 'linkedmesh') {
+                   const searchName = att.path || attName;
+                   if (!atlasObj.findRegion(searchName)) {
+                     console.warn('Stripping attachment missing from atlas:', searchName, 'type:', type);
+                     strippedAttachments.push({skinName: skin.name, slotName, attName});
+                     delete slot[attName];
+                   }
+                }
+              }
+              if (Object.keys(slot).length === 0) delete skin.attachments[slotName];
+            }
+          });
+        }
+
         if (!d.animations) return d;
 
         // Helper: remove empty-key entries and empty arrays from an object
@@ -766,14 +926,23 @@ function loadSpineFromData(name, skelData, atlasText) {
           // Skip empty or garbage animation names
           if (!name || name.length > 60 || /[^\x20-\x7E\u4e00-\u9fff\u3000-\u303f]/.test(name)) continue;
           const anim = d.animations[name];
-          // Remove deform (often broken from SCSP decoder)
-          delete anim.deform;
           // Deep-clean all sections: remove empty keys and empty arrays
-          for (const section of ['bones','slots','ik','transform','path']) {
+          for (const section of ['bones','slots','ik','transform','path','deform']) {
             if (anim[section]) {
               cleanObj(anim[section]);
               if (Object.keys(anim[section]).length === 0) delete anim[section];
             }
+          }
+          // Remove animation slot/bone refs that point to nonexistent objects
+          if (anim.slots) {
+            const validSlots = new Set((d.slots||[]).map(s => s.name).filter(Boolean));
+            for (const sn in anim.slots) { if (!validSlots.has(sn)) delete anim.slots[sn]; }
+            if (Object.keys(anim.slots).length === 0) delete anim.slots;
+          }
+          if (anim.bones) {
+            const validBones2 = new Set((d.bones||[]).map(b => b.name).filter(Boolean));
+            for (const bn in anim.bones) { if (!validBones2.has(bn)) delete anim.bones[bn]; }
+            if (Object.keys(anim.bones).length === 0) delete anim.bones;
           }
           // Clean drawOrder: remove entries with empty slot names
           if (anim.drawOrder) {
@@ -785,6 +954,26 @@ function loadSpineFromData(name, skelData, atlasText) {
           validAnims[name] = anim;
         }
         d.animations = validAnims;
+
+        // ── Fix 6: Strip deform timelines for attachments removed by Fix 4 ──
+        if (strippedAttachments.length > 0) {
+          for (const animName in d.animations) {
+            const anim = d.animations[animName];
+            if (!anim.deform) continue;
+            for (const {skinName, slotName, attName} of strippedAttachments) {
+              if (anim.deform[skinName] && anim.deform[skinName][slotName]) {
+                delete anim.deform[skinName][slotName][attName];
+                if (Object.keys(anim.deform[skinName][slotName]).length === 0)
+                  delete anim.deform[skinName][slotName];
+                if (Object.keys(anim.deform[skinName]).length === 0)
+                  delete anim.deform[skinName];
+                if (Object.keys(anim.deform).length === 0)
+                  delete anim.deform;
+              }
+            }
+          }
+        }
+
         return d;
       }
 
@@ -813,19 +1002,41 @@ function loadSpineFromData(name, skelData, atlasText) {
         currentSpine.y = ch * 0.85;
       }
       try {
-        buildSpine(sanitize(skelData));
+        buildSpine(sanitize(skelData, atlas));
         resolve();
       } catch(e) {
         console.warn('Sanitized build failed, trying static pose:', e.message);
         // Fallback: strip ALL animations, just show static pose
         try {
-          const staticData = JSON.parse(JSON.stringify(skelData));
+          const staticData = sanitize(skelData, atlas);
           staticData.animations = {};
           buildSpine(staticData);
           resolve();
         } catch(e2) {
-          console.error('Spine construction fully failed:', e2);
-          reject(e2);
+          console.warn('Static pose failed, trying without mesh attachments:', e2.message);
+          // Fallback 2: strip mesh attachments that cause matrix errors
+          try {
+            const safeData = sanitize(skelData, atlas);
+            safeData.animations = {};
+            if (safeData.skins && Array.isArray(safeData.skins)) {
+              safeData.skins.forEach(skin => {
+                if (!skin.attachments) return;
+                for (const slotName in skin.attachments) {
+                  const slot = skin.attachments[slotName];
+                  for (const attName in slot) {
+                    const t = (slot[attName].type || 'region');
+                    if (t === 'mesh' || t === 'linkedmesh') delete slot[attName];
+                  }
+                  if (Object.keys(slot).length === 0) delete skin.attachments[slotName];
+                }
+              });
+            }
+            buildSpine(safeData);
+            resolve();
+          } catch(e3) {
+            console.error('Spine construction fully failed:', e3);
+            reject(e3);
+          }
         }
       }
     }
@@ -972,6 +1183,36 @@ function viewPNG() {
     return;
   }
   window.open('/api/texture/' + currentModel + '.png', '_blank');
+}
+
+// ─── 启动封包工具 ───
+async function launchRepacker() {
+  try {
+    const r = await fetch('/api/launch_repacker', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      setStatus('封包工具已启动', 'ok');
+    } else {
+      setStatus(d.error || '启动失败', 'err');
+    }
+  } catch(e) {
+    setStatus('启动封包工具失败: ' + e.message, 'err');
+  }
+}
+
+// ─── 启动 PNG→SCT 转换器 ───
+async function launchPng2Sct() {
+  try {
+    const r = await fetch('/api/launch_png2sct', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      setStatus('PNG→SCT 转换器已启动', 'ok');
+    } else {
+      setStatus(d.error || '启动失败', 'err');
+    }
+  } catch(e) {
+    setStatus('启动 PNG→SCT 失败: ' + e.message, 'err');
+  }
 }
 </script>
 </body>
